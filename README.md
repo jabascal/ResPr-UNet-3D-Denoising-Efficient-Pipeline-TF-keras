@@ -45,7 +45,7 @@ The repository contains the following files:
 
 - **Demo_assess_variational_methods.m:** Under construction (Demo to assess TV, SPADE, among others)
 
-- **train models, others ... Under construction 
+- **Trained models and others:** Under construction 
 
 ## Data API ##
 Tensorflow data API automatizes the data pipeline, chaining transformations (preprocessing and data augmentation), shuffling data. While the model is being trained for a given batch on the GPU, data are being prepared to be ready for next batch on the GPU.The current implementation is based on the following sources:  
