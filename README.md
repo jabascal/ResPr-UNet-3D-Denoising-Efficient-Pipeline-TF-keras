@@ -17,7 +17,9 @@ Data provided in this repository consist of human thorax CT scans
 (kits19 dataset, https://kits19.grand-challenge.org/) 
 corrupted with additive Gaussian noise. 
 
-![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/kits19_example.jpg). A subsample (8 subjects) of these data can be directly dowloaded from https://www.dropbox.com/sh/3sozaz9m7pyxcsa/AAAx1VULqc3T4rYC55vTiuJta?dl=0 (in png format). 
+![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/kits19_example.jpg) 
+
+A subsample (8 subjects) of these data can be directly dowloaded from https://www.dropbox.com/sh/3sozaz9m7pyxcsa/AAAx1VULqc3T4rYC55vTiuJta?dl=0 (in png format). 
 
 Realistic synthetic and experimental spectral CT knee data used in the publication will be provided later on.  
 
