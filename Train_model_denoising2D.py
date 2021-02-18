@@ -1,0 +1,452 @@
+# -*- coding: utf-8 -*-
+"""
+ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras
+This repository contains data, code and results for the paper, A residual U-Net network with image prior for 3D image denoising, Proc. Eur. Signal Process. Conf. EUSIPCO, pp. 1264-1268, 2020. (hal-02500664)  
+   
+Train_model_denoising2D.py: Demo to train several 2D CNN models (simple CNN, U-Net). Models are trained using data API for efficient data pipelines. 
+    
+Data: 
+	Data provided in this repository consist of human thorax CT scans 
+	(kits19 dataset, https://kits19.grand-challenge.org/) 
+	corrupted with additive Gaussian noise. 
+
+Requirements: 
+    Tested on Python 3.7 and Tensorflow 2.4.1
+
+If you use this code, please cite the following publication: 
+    
+    JFPJ Abascal et al. A residual U-Net network with image prior for 3D 
+    image denoising, European Signal Processing Conference, 2020
+    https://hal.archives-ouvertes.fr/hal-02500664
+ 
+If you need to contact the author, please do so at juanabascal78@gmail.com
+
+JFPJ Abascal
+CREATIS, Biomedical Imaging Research Lab
+CNRS UMR 5220
+France    
+    
+"""
+
+import os
+import pandas as pd
+import numpy as np
+import PIL
+import PIL.Image
+import pathlib
+import time
+import tensorflow as tf
+#import tensorflow_datasets as tdfs
+from tensorflow import keras
+from tensorflow.keras.layers import Conv2D
+from tensorflow.keras.layers import Input
+from tensorflow.keras.layers import MaxPool2D
+from tensorflow.keras.layers import UpSampling2D
+from tensorflow.keras.layers import Concatenate
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+import pdb
+# -------------------------------------------------------
+# USER and PATHS
+platform        = "win32" # "linux", "linux2"
+
+# Select main path of the repository
+# os.chdir(repo_path)
+
+# Data paths for train and test
+path_data_main   = os.path.join(os.getcwd(),'data')
+#subpath_data_train = "Train"
+#subpath_data_test = "Test"
+subpath_data_train = "Scaled/Train"
+subpath_data_test = "Scaled/Test"
+
+os.chdir(path_data_main)
+
+# Path for results (trained model and tensorboard)
+path_results    = os.path.join(path_data_main, "Results")
+if os.path.exists(path_results) is False:
+    os.mkdir(path_results)
+    print('Subdirectory created for results: ' + path_results)
+
+# Name specifications
+name_save       = 'kits19_64x64_LR1e-5'
+# -------------------------------------------------------
+# CNN
+conv_model      = "UNet" # choose model: UNet, Convnet
+conv_filt       = 64        # number of filter on first layer
+kernel_size     = 3
+activation      = "relu"
+padding         = "same"
+pool_size       = (2, 2)
+
+# TRAIN
+batch_size      = 10 # 4
+epochs          = 100 # Early stopping on, check callbacks
+optimizer       = "Adam"
+learning_rate   = 1e-5       
+validation_split = 0.1
+train_eval_ratio = 0.9
+
+model_name      = conv_model + '_' + str(conv_filt )
+name_save       = name_save + '_' + model_name
+
+period_check_point = 10
+
+# IMAGE
+img_width, img_height, img_channels = (256,256,1)
+input_shape     = (img_width, img_height, img_channels)
+mode_limited_data = False
+if mode_limited_data == True:
+    ds_train_size   = 100 # number slices in trianing set
+ds_test_size    = 100
+perc_noise      = 0.05 # Additive Gaussian noise
+
+# Data augmentation
+#
+# central crop before applying random crop
+central_fraction = 0.8   
+
+# Default display settings
+plt.rcParams['figure.figsize'] = (4.0, 4.0) # set default size of plots
+plt.rcParams['image.interpolation'] = 'nearest'
+plt.rcParams['image.cmap'] = 'gray'
+plt.rcParams['lines.linewidth'] = 1.5
+plt.rcParams['font.size'] = 12
+#plt.rcParams['lines.linestyle'] = '--'
+
+# -------------------------------------------------------
+# FUNCTIONS DECLARATION
+#
+# DATA IMAGE PROCESSING
+# Data Augmentation
+def flip(x: tf.Tensor) -> tf.Tensor:
+    """Flip augmentation
+
+    Args:
+        x: Image to flip
+
+    Returns:
+        Augmented image
+    """
+    x = tf.image.random_flip_left_right(x)
+
+    return x
+
+def random_crop(img):
+    img = tf.image.central_crop(
+        img, central_fraction)
+    img = tf.image.random_crop(
+            img, size=[img_height, img_width, 1])
+
+    return img
+
+# Additive noise
+def add_gaussian_noise(img):
+    img_noisy = img + perc_noise*np.random.normal(0,1,img.shape)   
+    return img_noisy
+    
+# Load and process image
+def process_img(img):
+    img = tf.image.decode_png(img, img_channels)
+    
+    # convert unit8 tensor to floats in range [0,1]
+    img = tf.image.convert_image_dtype(img, tf.float32)
+    #img = tf.image.resize(img, [img_width, img_height])
+    return img 
+
+def get_process_target(file_path: tf.Tensor):
+    img = tf.io.read_file(file_path)
+    img = process_img(img)
+    return img 
+
+#def get_process_noisy(file_path: tf.Tensor):
+#    img = tf.io.read_file(file_path)
+#    img = process_img(img)
+#    img_noisy = add_gaussian_noise(img) 
+#    return img_noisy
+
+# LOG DIRECTORY FOR TENSORBOARD
+def get_run_logdir(path_log):
+    now         = time.strftime("run_%Y-%m-%d-%H-%S")
+    if platform == "linux" or platform == "linux2":
+        # linux
+        log_dir      = "{}//run-{}//".format(path_log, now, now)
+    elif platform == "win32":
+        # Windows
+        log_dir      = "{}\\run-{}\\".format(path_log, now, now)
+    return log_dir
+
+# MODEL
+#
+# Simple ConvNet
+def get_model_simple_convnet(input_shape = [28,28,1], 
+                             conv_filt=64, 
+                             kernel_size=3, 
+                             activation="relu",
+                             padding="same"):    
+    conv_args = {"activation": activation, 
+                 "padding": padding,
+                 "kernel_size": kernel_size}
+    model = keras.models.Sequential([            
+        #Input(shape = input_shape),
+        Conv2D(filters=conv_filt, input_shape=input_shape, **conv_args),
+        Conv2D(filters=conv_filt, **conv_args),
+        Conv2D(filters=1, kernel_size=1, activation=None)
+    ])
+    """  
+    # Alternative definition
+    model = keras.models.Sequential()
+    model.add(Input(shape = input_shape))
+    model.add(Conv2D(filters=64, kernel_size=3, activation="relu"))
+    model.add(Conv2D(filters=64, kernel_size=3, activation="relu"))
+    model.add(Conv2D(filters=1, kernel_size=1, activation="linear"))
+    """
+    """
+    # Alternative definition
+    inputs = Input(shape=input_shape)
+    x = Conv2D(filters=64, **conv_args)(inputs)
+    x = Conv2D(filters=64, **conv_args)(x)
+    outputs = Conv2D(filters=1, kernel_size=1, **conv_args)(x)
+    model = keras.Model(inputs, outputs)
+    """    
+    return model
+
+# Simple 2D U-Net
+def get_model_unet(input_shape = [28,28,1], 
+                             conv_filt=32, 
+                             kernel_size=3, 
+                             activation="relu",
+                             padding="same"):
+    conv_args = {"activation": activation, 
+                 "padding": padding,
+                 "kernel_size": kernel_size}
+    input_ = Input(shape=input_shape)
+    conv1 = Conv2D(filters=conv_filt, **conv_args)(input_)
+    conv2 = Conv2D(filters=conv_filt, **conv_args)(conv1)
+    pool1 = MaxPool2D(pool_size=pool_size)(conv2)
+    #
+    conv3 = Conv2D(filters=2*conv_filt, **conv_args)(pool1)
+    conv4 = Conv2D(filters=2*conv_filt, **conv_args)(conv3)
+    pool2 = MaxPool2D(pool_size=pool_size)(conv4)
+    #
+    conv5 = Conv2D(filters=4*conv_filt, **conv_args)(pool2)
+    conv6 = Conv2D(filters=2*conv_filt, **conv_args)(conv5)
+    up1 = UpSampling2D(size=(2,2))(conv6)
+    #
+    conc1 = Concatenate()([conv4, up1])
+    #
+    conv7 = Conv2D(filters=2*conv_filt, **conv_args)(conc1)
+    conv8 = Conv2D(filters=conv_filt, **conv_args)(conv7)
+    up2 = UpSampling2D(size=(2,2))(conv8)
+    #
+    conc2 = Concatenate()([conv2, up2])
+    #
+    conv9 = Conv2D(filters=conv_filt, **conv_args)(conc2)
+    conv10 = Conv2D(filters=conv_filt, **conv_args)(conv9)
+    #
+    output = Conv2D(filters=1, kernel_size=1, activation=None)(conv10)
+    #
+    model = keras.Model(inputs=[input_], outputs=[output])
+    return model
+
+# IMAGE VISUALIZATION
+def displaySlices(X_Tensor, titles, figsize=(12,4), nameSave = []):
+    # displaySlices(X_Tensor, titles)
+    # displaySlices(X_Tensor, titles, figsize=(12,6), nameSave = 'name.png')
+    #
+    # Display slices (target, noisy image and prior)
+    #
+    # Inputs:
+    #
+    # X_Tensor = tuple of 2D arrays. 
+    # X_Tensor =  (X_batch_train[0,:,:,0],S_batch_train[0,:,:,0],S_batch_pr_train[0,:,:,0])
+    # titles    = ('Target','Noisy','Prior') 
+    num_dim    = len(X_Tensor)
+    fig, axarr = plt.subplots(1, num_dim, figsize=figsize)
+    fig.tight_layout()    
+    for i in range(num_dim):
+        img0 = axarr[i].imshow(X_Tensor[i],cmap='gray')
+        divider = make_axes_locatable(axarr[i])
+        cax = divider.append_axes("right", size="7%", pad=0.05)
+        plt.colorbar(img0, cax = cax) 
+        axarr[i].set_title(titles[i])
+        axarr[i].axis('off')
+    plt.show()
+    if nameSave:
+        fig.savefig(nameSave, dpi = 300, bbox_inches='tight') 
+
+# -------------------------------------------------------
+# CALLBACKS 
+# Tensorboard
+# tensorboard --logdir=log_dir
+log_dir = get_run_logdir(path_results)    
+tensorboard_cb = keras.callbacks.TensorBoard(log_dir)
+checkpoint_best_cb = keras.callbacks.ModelCheckpoint(os.path.join(path_results,
+                    name_save+'_model_best.h5'), period=period_check_point, save_best_only=True)
+#checkpoint_cb = keras.callbacks.ModelCheckpoint(os.path.join(path_results,
+#                    name_save+'_model_ckpt.h5'), period=period_check_point)
+earlystop_cb = keras.callbacks.EarlyStopping(os.path.join(path_results,
+                    name_save+'_model_best.h5'), 
+                    patience=5, restore_best_weights=True) # monitor='val_mse',
+#callbacks = [ESPCNCallback(), early_stopping_callback, model_checkpoint_callback]
+callbacks = [tensorboard_cb, earlystop_cb, checkpoint_best_cb]
+# -------------------------------------------------------
+# DATASETS
+
+# Create file list 
+# 
+# Train set
+# tf.data.Dataset.from_tensor_slices with glob more efficient
+data_dir_train = pathlib.Path(subpath_data_train) 
+filenames_train = list(data_dir_train.glob('*/*.png'))
+fnames_train = [str(fname) for fname in filenames_train]
+print(str(filenames_train[0]))
+PIL.Image.open(str(filenames_train[0]))
+
+# Test set
+data_dir_test = pathlib.Path(subpath_data_test) 
+filenames_test = list(data_dir_test.glob('*/*.png'))
+fnames_test = [str(fname) for fname in filenames_test]
+
+# Datasets ds train and test
+if mode_limited_data == False:
+    ds_train_size  = len(fnames_train)
+filelist_train_ds = tf.data.Dataset.from_tensor_slices(fnames_train[:ds_train_size])
+filelist_test_ds = tf.data.Dataset.from_tensor_slices(fnames_test[:ds_test_size])
+
+# Check train ds: display images
+# filelist_ds     = tf.data.Dataset.list_files(str(data_dir/'*/*'))
+for a in filelist_train_ds.take(3):
+    fname = a.numpy().decode("utf-8") # not in TF 1.4
+    print(fname)
+    display(PIL.Image.open(fname))
+
+# Split train and eval 
+ds_train = filelist_train_ds.take(int(ds_train_size*train_eval_ratio))
+ds_eval = filelist_train_ds.skip(int(ds_train_size*train_eval_ratio))
+
+print("Train data num: ", ds_train.cardinality().numpy())
+print("Eval data num: ", ds_eval.cardinality().numpy())
+
+# Test set
+ds_test = filelist_test_ds.take(ds_test_size)
+print("Test data num: ", ds_test.cardinality().numpy())
+
+# Transform data
+# Load, normalize, data augmentation (random crop, horizontal flip), 
+# corrupt with additive Gaussian noise 
+map_ops     = [get_process_target, flip, random_crop] # Select data aug ops (flip, randpm_crop)
+
+# TRAIN
+for f in map_ops:
+    ds_train = ds_train.map(lambda x: f(x),
+        num_parallel_calls=tf.data.AUTOTUNE)   
+#for a in ds_train.take(2):
+#    plt.imshow(a.numpy()[:,:,0])
+#    plt.show() 
+ds_train = ds_train.map(  # return tuple (noisy, target) for training
+        lambda x: (add_gaussian_noise(x), x),
+        num_parallel_calls = tf.data.AUTOTUNE)
+print('Examples of training data random crops')
+for a,b in ds_train.take(5):
+    displaySlices([a.numpy()[:,:,0],b.numpy()[:,:,0] ], 
+               ['Noisy image', 'Ray image'], figsize=(12,4))   
+# EVAL
+for f in map_ops:
+    ds_eval = ds_eval.map(lambda x: f(x),
+        num_parallel_calls=tf.data.AUTOTUNE)   
+ds_eval = ds_eval.map(  
+        lambda x: (add_gaussian_noise(x), x),
+        num_parallel_calls = tf.data.AUTOTUNE)
+
+# TEST    
+for f in map_ops:
+    ds_test = ds_test.map(lambda x: f(x),
+        num_parallel_calls=tf.data.AUTOTUNE)   
+ds_test = ds_test.map(  
+        lambda x: (add_gaussian_noise(x), x),
+        num_parallel_calls = tf.data.AUTOTUNE)
+
+# .cache() keeps the images in memory after they're loaded off disk during 
+# the first epoch. If dataset is too large (also use this method to create 
+# a performant on-disk cache.
+# .prefetch() overlaps data preprocessing and model execution while training
+ds_train_batched = ds_train.batch(batch_size).cache().prefetch(tf.data.experimental.AUTOTUNE)  
+ds_eval_batched = ds_eval.batch(batch_size).cache().prefetch(tf.data.experimental.AUTOTUNE)  
+
+# -------------------------------------------------------
+# MODEL AND TRAIN 
+if conv_model == "Convnet": # UNet, Convnet
+    model   = get_model_simple_convnet(input_shape=input_shape)
+elif conv_model == "UNet":    
+    model   = get_model_unet(input_shape=input_shape)
+
+model.summary()
+# model.layers
+
+loss_fn = keras.losses.MeanSquaredError()
+optimizer = keras.optimizers.Adam(learning_rate=learning_rate)
+
+# TRAIN
+model.compile(optimizer=optimizer,
+              loss=loss_fn, 
+              metrics=["mse"])
+# model.fit(ds_train_batched, epochs=1,callbacks=[tensorboard_callback])
+start_time = time.time()
+history = model.fit(ds_train_batched, 
+                    epochs=epochs, 
+                    validation_data=ds_eval_batched, 
+                    callbacks=callbacks)
+
+timeTrain   = int(time.time()-start_time)/3600
+print('Training time (hours): {0: .2f}'.format(timeTrain))
+
+# Losses
+pd.DataFrame(history.history).plot(figsize=[8, 5], logy=True)
+plt.show()
+# -------------------------------------------------------
+# PREDICT AND ERROR
+# 
+# Test data
+data_test = []
+data_test_noisy = []
+count = 0
+for a_n, a in ds_test.take(ds_test_size):
+    data_test_this = a.numpy()  
+    data_test_noisy_this = a_n.numpy() 
+    if count == 0:
+        data_test = data_test_this
+        data_test_noisy = data_test_this
+        count = 1
+    else:            
+        data_test = np.append(data_test, data_test_this, axis=2)
+        data_test_noisy = np.append(data_test_noisy, data_test_noisy_this, axis=2)
+data_test = np.transpose(data_test, (2,0,1))
+data_test_noisy = np.transpose(data_test_noisy, (2,0,1))
+data_test = data_test[:,:,:,np.newaxis] 
+data_test_noisy = data_test_noisy[:,:,:,np.newaxis] 
+
+data_pred = model.predict(data_test_noisy)
+data_pred_err = np.mean(100*np.linalg.norm(data_test[:,:,:,0]-
+                data_pred[:,:,:,0], axis=(1, 2))/np.linalg.norm(data_test[:,:,:,0], axis=(1, 2)))
+print('Error %.1f' % data_pred_err)
+
+# Evaluation
+#with tf.name_scope("eval"):    
+#    mse_rel    = tf.norm(X - X_)/tf.norm(X)
+
+# Display result
+print('Example of restored images')
+for i in range(5):
+    displaySlices([data_test[i,:,:,0], data_test_noisy[i,:,:,0], 
+                   data_pred[i,:,:,0]], 
+               ['Raw image', 'Noisy image', 'Denoised image'], 
+               figsize=(12,4))
+
+# -------------------------------------------------------
+# SAVE MODEL
+model.save(os.path.join(path_results, name_save + "_model_last.h5"))
+# model = keras.models.load_model('UNet_32.h5')
+# weights, biases= history.model.layers[1].weights
+# -------------------------------------------------------
