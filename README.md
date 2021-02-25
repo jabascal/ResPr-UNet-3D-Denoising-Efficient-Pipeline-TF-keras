@@ -10,7 +10,9 @@ was shown to improve convergence and maintain image texture of the prior image, 
 
 In this repository, we provide and compare the proposed method to 2D and 3D variational and deep learning approaches. 
 
-Learning approaches are trained using efficient tensorflow pipelines for image datasets, based on keras and tf.data. 
+Learning approaches are trained using efficient tensorflow pipelines for image datasets, based on keras and tf.data (see below for more details). 
+
+Tensorboard callbacks have been used to visualize losses and denoised images during training. 
 
 ## Data 
 Data provided in this repository consist of human thorax CT scans 
@@ -19,17 +21,48 @@ corrupted with additive Gaussian noise.
 
 ![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/kit19_example.jpg) 
 
-A subsample (8 subjects) of these data can be directly dowloaded from https://www.dropbox.com/sh/3sozaz9m7pyxcsa/AAAx1VULqc3T4rYC55vTiuJta?dl=0 (in png format). 
+A subsample of kits19 data can be directly dowloaded from https://www.dropbox.com/sh/3sozaz9m7pyxcsa/AAAx1VULqc3T4rYC55vTiuJta?dl=0 (in png format, data with loosy conversion from float64 to unit8; fetch original data from the kits19 link): 
+- **'\Data\Train\':** All slices for 6 subjects.  
+- **'\Data\Test':** All slices for 2 subjects. 
+- **'Kits19_train_data_200subj_2kimgs_2pcnoise_crop_rnd.npz\':** 2k slices randomly selectec from 200 subjects. 
+- **'Kits19_test_data_2subj_2pcnoise_crop_rnd.npz\':** Data used for test corresponding to two subjects. 
 
 Realistic synthetic and experimental spectral CT knee data used in the publication will be provided later on.  
 
 ![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/knee_example.jpg)
 
-## Code
-We provide Python code under tensorflow with keras. The python code has been tested  under Python 3.7 and tensorflow 2.4.1. 
+## Installation
+We provide Python code under tensorflow with keras. The python code has been tested  under Python 3.8 and tensorflow 2.4.1.  
+
+Different TF versions required specific cudatoolkit version. With anaconda one can handle several cuda versions in one machine. To install the tested version on Windows:  
+   
+---
+conda create -n tf2 anaconda python=3.8 
+conda install cudatoolkit=11.0 cudnn=8.0 -c=conda-forge
+pip install --upgrade tensorflow-gpu==2.4.1 
+python
+import tensorflow as tf 
+tf.test.is_gpu_available()
+---
+
+For TF compatibilities: https://www.tensorflow.org/install/source_windows 
+For setting up Tensorflow-GPU with Cuda and Anaconda on Windows: 
+https://towardsdatascience.com/setting-up-tensorflow-gpu-with-cuda-and-anaconda-onwindows-2ee9c39b5c44
 
 ## Summary of results ##
-In progress ...
+
+### 2D learning-based approaches ###
+
+The following figures show results for U-Net (with 32 and 64 filters on the first layer; 332,641 parameters) and a simple 3-layer ConvNet (37,633 parameters), for 2 % additive Gaussian noise. Unless specified, training data is comprised of 2000 slices taking randomly from all 200 subjects. Similar results were obtained by training on 10000 (10k) slices. Worse results corresponded to considering only 6 subjects (6sub, ~2k slices). U-Net 32 trained on 1h30 min and the ConvNet in 28 min. 
+Train data file: (Kits19_train_data_200subj_2kimgs_2pcnoise_crop_rnd.npz. Test data file: Kits19_test_data_2subj_2pcnoise_crop_rnd.npz.  
+
+![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/kits19_UNet_ConvNet_comp_test_ex4.jpg) 
+
+![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/kits19_UNet_ConvNet_comp_zoom_test_ex4.jpg) 
+
+The following figures show results for U-Net and a simple 3-layer ConvNet, for 5 % additive Gaussian noise. 
+
+... In progress ...
 
 ##  Repository files ##
 
@@ -41,11 +74,18 @@ The repository contains the following files:
 
 - **Train_model_denoising3D.py:** Under construction (Demo to train 3D models (3D U-Net, ResPr-UNet)
 
-- **Demo_assess_learning_methods.m:** Under construction 
+- **Demo_assess_2D_learning_methods.py:** Under construction 
 
-- **Demo_assess_variational_methods.m:** Under construction (Demo to assess TV, SPADE, among others)
+- **Demo_assess_3D_learning_methods.py:** Under construction 
+
+- **Demo_assess_variational_methods.py:** Under construction (Demo to assess TV, SPADE, among others)
 
 - **Trained models and others:** Under construction 
+
+### Trained models ###
+- **kits19_200subj_data2k_Convnet_64_noisepc2_model_best.h5:** Simple ConvNet (3 layers, 64 filters) trained on 2% additive Gaussian noise for 2,000 slices randomly selected from 200 subjects. 
+
+- **kits19_200subj_data2k_UNet_32_noisepc2_model_best.h5:** U-Net (32 filters on the first layer) trained on 2% additive Gaussian noise for 2,000 slices randomly selected from 200 subjects. 
 
 ## Data API ##
 Tensorflow data API automatizes the data pipeline, chaining transformations (preprocessing and data augmentation), shuffling data. While the model is being trained for a given batch on the GPU, data are being prepared to be ready for next batch on the GPU.The current implementation is based on the following sources:  

@@ -46,7 +46,8 @@ from tensorflow.keras.layers import Concatenate
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-import pdb
+import io
+import random
 # -------------------------------------------------------
 # USER and PATHS
 platform        = "win32" # "linux", "linux2"
@@ -55,52 +56,56 @@ platform        = "win32" # "linux", "linux2"
 # os.chdir(repo_path)
 
 # Data paths for train and test
-path_data_main   = os.path.join(os.getcwd(),'data')
+path_main = os.getcwd()
+path_data_main   = os.path.join(path_main,'Data_few')
 #subpath_data_train = "Train"
 #subpath_data_test = "Test"
-subpath_data_train = "Scaled/Train"
-subpath_data_test = "Scaled/Test"
+subpath_data_train = "Train"
+subpath_data_test = "Test"
 
 os.chdir(path_data_main)
 
 # Path for results (trained model and tensorboard)
-path_results    = os.path.join(path_data_main, "Results")
+path_results    = os.path.join(path_main, "Results")
 if os.path.exists(path_results) is False:
     os.mkdir(path_results)
     print('Subdirectory created for results: ' + path_results)
 
 # Name specifications
-name_save       = 'kits19_64x64_LR1e-5'
+# name_save       = 'kits19_200subj_data2k'
+name_save       = 'kits19_6subj_data2k'
 # -------------------------------------------------------
 # CNN
 conv_model      = "UNet" # choose model: UNet, Convnet
-conv_filt       = 64        # number of filter on first layer
+conv_filt       = 32        # number of filter on first layer
 kernel_size     = 3
 activation      = "relu"
 padding         = "same"
 pool_size       = (2, 2)
 
 # TRAIN
-batch_size      = 10 # 4
+batch_size      = 32 # 4
 epochs          = 100 # Early stopping on, check callbacks
 optimizer       = "Adam"
-learning_rate   = 1e-5       
+learning_rate   = 1e-4       
 validation_split = 0.1
 train_eval_ratio = 0.9
 
 model_name      = conv_model + '_' + str(conv_filt )
 name_save       = name_save + '_' + model_name
 
-period_check_point = 10
+period_check_point = 5
 
 # IMAGE
 img_width, img_height, img_channels = (256,256,1)
 input_shape     = (img_width, img_height, img_channels)
 mode_limited_data = False
 if mode_limited_data == True:
-    ds_train_size   = 100 # number slices in trianing set
+    ds_train_size   = 10000 # number slices in training set
 ds_test_size    = 100
-perc_noise      = 0.05 # Additive Gaussian noise
+perc_noise      = 0.02 # Additive Gaussian noise
+
+name_save = name_save + '_noisepc' + str(int(100*perc_noise))
 
 # Data augmentation
 #
@@ -130,6 +135,7 @@ def flip(x: tf.Tensor) -> tf.Tensor:
         Augmented image
     """
     x = tf.image.random_flip_left_right(x)
+    x = tf.image.random_flip_up_down(x)
 
     return x
 
@@ -168,7 +174,7 @@ def get_process_target(file_path: tf.Tensor):
 
 # LOG DIRECTORY FOR TENSORBOARD
 def get_run_logdir(path_log):
-    now         = time.strftime("run_%Y-%m-%d-%H-%S")
+    now         = time.strftime("run_%Y-%m-%d-%H-%M-%S")
     if platform == "linux" or platform == "linux2":
         # linux
         log_dir      = "{}//run-{}//".format(path_log, now, now)
@@ -181,10 +187,10 @@ def get_run_logdir(path_log):
 #
 # Simple ConvNet
 def get_model_simple_convnet(input_shape = [28,28,1], 
-                             conv_filt=64, 
-                             kernel_size=3, 
-                             activation="relu",
-                             padding="same"):    
+                              conv_filt=64, 
+                              kernel_size=3, 
+                              activation="relu",
+                              padding="same"):    
     conv_args = {"activation": activation, 
                  "padding": padding,
                  "kernel_size": kernel_size}
@@ -217,7 +223,8 @@ def get_model_unet(input_shape = [28,28,1],
                              conv_filt=32, 
                              kernel_size=3, 
                              activation="relu",
-                             padding="same"):
+                             padding="same",
+                             pool_size=pool_size):
     conv_args = {"activation": activation, 
                  "padding": padding,
                  "kernel_size": kernel_size}
@@ -275,22 +282,105 @@ def displaySlices(X_Tensor, titles, figsize=(12,4), nameSave = []):
     plt.show()
     if nameSave:
         fig.savefig(nameSave, dpi = 300, bbox_inches='tight') 
+    return fig
 
+def image_grid(images_eval_rnp, images_eval_rnp_labels):
+  """Return a grid image as a matplotlib figure."""
+  # Create a figure to contain the plot.
+
+  figure = plt.figure(figsize=(12,4))
+  for i in range(3):
+    # Start next subplot.
+    plt.subplot(1, 3, i + 1, title=images_eval_rnp_labels[i])
+    plt.xticks([])
+    plt.yticks([])
+    plt.grid(False)
+    plt.imshow(images_eval_rnp[i], cmap=plt.cm.binary)
+
+  return figure
+
+def plot_to_image(figure):
+  """Converts the matplotlib plot specified by 'figure' to a PNG image and
+  returns it. The supplied figure is closed and inaccessible after this call.
+  From https://www.tensorflow.org/tensorboard/image_summaries
+  """
+  # Save the plot to a PNG in memory.
+  buf = io.BytesIO()
+  plt.savefig(buf, format='png')
+  # Closing the figure prevents it from being displayed directly inside
+  # the notebook.
+  plt.close(figure)
+  buf.seek(0)
+  # Convert PNG buffer to TF image
+  image = tf.image.decode_png(buf.getvalue(), channels=4)
+  # Add the batch dimension
+  image = tf.expand_dims(image, 0)
+  return image
+
+def log_denoised_image(epoch, logs):
+    images_eval_pred = model.predict(images_eval_noisy)
+    images_eval_rnp = [images_eval[0,:,:,:], 
+                        images_eval_noisy[0,:,:,:],
+                        images_eval_pred[0,:,:,:]]
+    images_eval_rnp_labels = ['Raw', 'Noisy', 'Denoised']
+
+    figure = image_grid(images_eval_rnp, images_eval_rnp_labels)    
+    
+    with file_writer_cm.as_default():
+        tf.summary.image("Denoised image", plot_to_image(figure), step=epoch)                     
+
+def get_imgs_from_dataset(ds_test, ds_test_size):
+    # Take images from data set ds_test: (data_test, data_test_noisy) 
+    data_test = []
+    data_test_noisy = []
+    count = 0
+    for a_n, a in ds_test.take(ds_test_size):
+        data_test_this = a.numpy()  
+        data_test_noisy_this = a_n.numpy() 
+        if count == 0:
+            data_test = data_test_this
+            data_test_noisy = data_test_this
+            count = 1
+        else:            
+            data_test = np.append(data_test, data_test_this, axis=2)
+            data_test_noisy = np.append(data_test_noisy, data_test_noisy_this, axis=2)
+    data_test = np.transpose(data_test, (2,0,1))
+    data_test_noisy = np.transpose(data_test_noisy, (2,0,1))
+    data_test = data_test[:,:,:,np.newaxis] 
+    data_test_noisy = data_test_noisy[:,:,:,np.newaxis] 
+    return data_test, data_test_noisy
 # -------------------------------------------------------
 # CALLBACKS 
 # Tensorboard
 # tensorboard --logdir=log_dir
 log_dir = get_run_logdir(path_results)    
 tensorboard_cb = keras.callbacks.TensorBoard(log_dir)
-checkpoint_best_cb = keras.callbacks.ModelCheckpoint(os.path.join(path_results,
-                    name_save+'_model_best.h5'), period=period_check_point, save_best_only=True)
-#checkpoint_cb = keras.callbacks.ModelCheckpoint(os.path.join(path_results,
-#                    name_save+'_model_ckpt.h5'), period=period_check_point)
-earlystop_cb = keras.callbacks.EarlyStopping(os.path.join(path_results,
-                    name_save+'_model_best.h5'), 
-                    patience=5, restore_best_weights=True) # monitor='val_mse',
-#callbacks = [ESPCNCallback(), early_stopping_callback, model_checkpoint_callback]
-callbacks = [tensorboard_cb, earlystop_cb, checkpoint_best_cb]
+
+# save best model every few iterations
+checkpoint_best_cb = keras.callbacks.ModelCheckpoint(
+    os.path.join(path_results, name_save+'_model_best.h5'), 
+    period=period_check_point, 
+    save_best_only=True,
+    monitor='val_mse')
+
+# early stopping based on a given metric
+# earlystop_cb = keras.callbacks.EarlyStopping(
+#     os.path.join(path_results, name_save+'_model_best.h5')
+#     patience=period_check_point, 
+#     monitor='val_mse',
+#     restore_best_weights=True)
+
+# profiler API to improve data pipeline efficiency
+# profile_batch indicate batches on which apply profiler
+# profile_cb = tf.keras.callbacks.TensorBoard(
+#     log_dir)#,
+    #profile_batch='20, 40')
+
+# Predict (Denoised) an image every epoch to visualize in tensorboard
+file_writer_cm = tf.summary.create_file_writer(log_dir + '/cm')
+image_den_cb = tf.keras.callbacks.LambdaCallback(on_epoch_end=log_denoised_image)
+
+callbacks = [tensorboard_cb, checkpoint_best_cb, image_den_cb]
 # -------------------------------------------------------
 # DATASETS
 
@@ -312,6 +402,8 @@ fnames_test = [str(fname) for fname in filenames_test]
 # Datasets ds train and test
 if mode_limited_data == False:
     ds_train_size  = len(fnames_train)
+else:
+    random.shuffle(fnames_train)
 filelist_train_ds = tf.data.Dataset.from_tensor_slices(fnames_train[:ds_train_size])
 filelist_test_ds = tf.data.Dataset.from_tensor_slices(fnames_test[:ds_test_size])
 
@@ -338,20 +430,26 @@ print("Test data num: ", ds_test.cardinality().numpy())
 # corrupt with additive Gaussian noise 
 map_ops     = [get_process_target, flip, random_crop] # Select data aug ops (flip, randpm_crop)
 
+# Shard operator (for several workers) used early in the dataset pipeline (when reading from a set of TFRecord files)
+# ds_train = ds_train.shard()
+
 # TRAIN
 for f in map_ops:
     ds_train = ds_train.map(lambda x: f(x),
         num_parallel_calls=tf.data.AUTOTUNE)   
-#for a in ds_train.take(2):
-#    plt.imshow(a.numpy()[:,:,0])
-#    plt.show() 
+"""
+for a in ds_train.take(2):
+    plt.imshow(a.numpy()[:,:,0])
+    plt.show() 
+"""
+
 ds_train = ds_train.map(  # return tuple (noisy, target) for training
         lambda x: (add_gaussian_noise(x), x),
         num_parallel_calls = tf.data.AUTOTUNE)
 print('Examples of training data random crops')
 for a,b in ds_train.take(5):
     displaySlices([a.numpy()[:,:,0],b.numpy()[:,:,0] ], 
-               ['Noisy image', 'Ray image'], figsize=(12,4))   
+               ['Noisy image', 'Raw image'], figsize=(12,4))   
 # EVAL
 for f in map_ops:
     ds_eval = ds_eval.map(lambda x: f(x),
@@ -368,25 +466,103 @@ ds_test = ds_test.map(
         lambda x: (add_gaussian_noise(x), x),
         num_parallel_calls = tf.data.AUTOTUNE)
 
-# .cache() keeps the images in memory after they're loaded off disk during 
+
+# Test data
+data_test, data_test_noisy = get_imgs_from_dataset(ds_test, ds_test_size)
+
+"""
+# Save test subset
+np.savez(os.path.join(path_data_main,
+                            'Kits19_test_data_2subj_2pcnoise_crop_rnd' + '.npz'), 
+                          data_test = data_test, data_test_noisy=data_test_noisy)    
+
+# Save train subset of data
+data_train, data_train_noisy = get_imgs_from_dataset(ds_train, ds_train_size)
+
+np.savez(os.path.join(path_data_main,
+                            'Kits19_train_data_200subj_2kimgs_2pcnoise_crop_rnd' + '.npz'), 
+                          data_train = data_train, data_train_noisy=data_train_noisy)    
+"""
+
+# Buffer size greater than or equal to the full size of the dataset 
+buffer_size_train = ds_train.cardinality().numpy()
+buffer_size_eval = ds_eval.cardinality().numpy()
+
+# DS: .cache() keeps the images in memory after they're loaded off disk during 
 # the first epoch. If dataset is too large (also use this method to create 
 # a performant on-disk cache.
 # .prefetch() overlaps data preprocessing and model execution while training
-ds_train_batched = ds_train.batch(batch_size).cache().prefetch(tf.data.experimental.AUTOTUNE)  
-ds_eval_batched = ds_eval.batch(batch_size).cache().prefetch(tf.data.experimental.AUTOTUNE)  
+# To randomize iteration order, call shuffle after calling cache
+ds_train_batched = ds_train.batch(batch_size).cache()
+#ds_train_batched = ds_train_batched.repeat(3)
+ds_train_batched = ds_train_batched.shuffle(buffer_size=buffer_size_train, reshuffle_each_iteration=True)
+ds_train_batched = ds_train_batched.prefetch(tf.data.experimental.AUTOTUNE)  
+#
+ds_eval_batched = ds_eval.batch(batch_size).cache()
+#ds_eval_batched = ds_eval_batched.repeat(3)
+ds_eval_batched = ds_eval_batched.shuffle(buffer_size=buffer_size_eval, reshuffle_each_iteration=True)
+ds_eval_batched = ds_eval_batched.prefetch(tf.data.experimental.AUTOTUNE)  
+# ds_train_batched = ds_train.batch(batch_size)
+# ds_eval_batched = ds_eval.batch(batch_size) 
+ 
+# Images eval for tensorboard summary
+images_eval = []
+images_eval_noisy = []
+count = 0
+for a_n, a in ds_eval_batched.take(1):
+    images_eval = a.numpy()
+    images_eval_noisy = a_n.numpy()
+
+# Write images to tensorboard
+# Create a file writer 
+# log_dir = get_run_logdir(path_results)
+# file_writer_cm = tf.summary.create_file_writer(log_dir + '/cm')
+# images_eval_pred = model.predict(images_eval_noisy)
+
+"""
+# Log given image tensor
+with file_writer_cm.as_default():
+    N = images_eval.shape
+    imgs = np.reshape([images_eval[0,:,:,0], images_eval[0,:,:,0]], 
+                      (-1,N[1],N[2],1))
+    tf.summary.image('Eval image', imgs, max_outputs=2, step=0)
+"""
+"""
+# Log a general figure
+images_eval_rnp = [images_eval[0,:,:,0], 
+                   images_eval_noisy[0,:,:,0],
+                   images_eval_pred[0,:,:,0]]
+figure = image_grid()
+with file_writer_cm.as_default():
+    tf.summary.image("Denoised image", plot_to_image(figure), step=0)
+    
+"""
 
 # -------------------------------------------------------
 # MODEL AND TRAIN 
 if conv_model == "Convnet": # UNet, Convnet
-    model   = get_model_simple_convnet(input_shape=input_shape)
+    model   = get_model_simple_convnet(
+        input_shape=input_shape, 
+        conv_filt=conv_filt,
+        kernel_size=kernel_size,
+        activation=activation,
+        padding=padding)
 elif conv_model == "UNet":    
-    model   = get_model_unet(input_shape=input_shape)
+    model   = get_model_unet(
+        input_shape=input_shape, 
+        conv_filt=conv_filt,
+        kernel_size=kernel_size,
+        activation=activation,
+        padding=padding,
+        pool_size=pool_size)
+
 
 model.summary()
 # model.layers
 
 loss_fn = keras.losses.MeanSquaredError()
 optimizer = keras.optimizers.Adam(learning_rate=learning_rate)
+
 
 # TRAIN
 model.compile(optimizer=optimizer,
@@ -408,25 +584,20 @@ plt.show()
 # -------------------------------------------------------
 # PREDICT AND ERROR
 # 
+# Load best model
+model = keras.models.load_model(os.path.join(path_results, 
+                                             name_save+'_model_best.h5'))
+    
 # Test data
-data_test = []
-data_test_noisy = []
-count = 0
-for a_n, a in ds_test.take(ds_test_size):
-    data_test_this = a.numpy()  
-    data_test_noisy_this = a_n.numpy() 
-    if count == 0:
-        data_test = data_test_this
-        data_test_noisy = data_test_this
-        count = 1
-    else:            
-        data_test = np.append(data_test, data_test_this, axis=2)
-        data_test_noisy = np.append(data_test_noisy, data_test_noisy_this, axis=2)
-data_test = np.transpose(data_test, (2,0,1))
-data_test_noisy = np.transpose(data_test_noisy, (2,0,1))
-data_test = data_test[:,:,:,np.newaxis] 
-data_test_noisy = data_test_noisy[:,:,:,np.newaxis] 
+data_test, data_test_noisy = get_imgs_from_dataset(ds_test, ds_test_size)
 
+"""
+# Save test data
+np.savez(os.path.join(path_data_main,
+                            'Kits19_test_data_2subj_2pcnoise_crop_rnd' + '.npz'), 
+                          data_test = data_test, data_test_noisy=data_test_noisy)    
+"""
+# Predict (denoise image)
 data_pred = model.predict(data_test_noisy)
 data_pred_err = np.mean(100*np.linalg.norm(data_test[:,:,:,0]-
                 data_pred[:,:,:,0], axis=(1, 2))/np.linalg.norm(data_test[:,:,:,0], axis=(1, 2)))
@@ -442,7 +613,9 @@ for i in range(5):
     displaySlices([data_test[i,:,:,0], data_test_noisy[i,:,:,0], 
                    data_pred[i,:,:,0]], 
                ['Raw image', 'Noisy image', 'Denoised image'], 
-               figsize=(12,4))
+               figsize=(12,4),
+               nameSave=os.path.join(path_results,
+                            name_save+'_test_ex'+str(i)+'.png'))
 
 # -------------------------------------------------------
 # SAVE MODEL
