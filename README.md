@@ -61,9 +61,9 @@ https://towardsdatascience.com/setting-up-tensorflow-gpu-with-cuda-and-anaconda-
 The following figures show results for U-Net (with 32 and 64 filters on the first layer; 332,641 parameters) and a simple 3-layer ConvNet (37,633 parameters), for 2 % additive Gaussian noise. Unless specified, training data is comprised of 2000 slices taking randomly from all 200 subjects. Similar results were obtained by training on 10000 (10k) slices. Worse results corresponded to considering only 6 subjects (6sub, ~2k slices). U-Net 32 trained on 1h30 min and the ConvNet in 28 min. 
 Train data file: (Kits19_train_data_200subj_2kimgs_2pcnoise_crop_rnd.npz. Test data file: Kits19_test_data_2subj_2pcnoise_crop_rnd.npz.  
 
-![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/kits19_UNet_ConvNet_comp_test_ex3.png) 
+![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/kits19_UNet_ConvNet_comp_test_ex3-sm.png) 
 
-![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/kits19_UNet_ConvNet_comp_zoom_test_ex3.png) 
+![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/kits19_UNet_ConvNet_comp_zoom_test_ex3_sm.png) 
 
 The following figures show results for U-Net and a simple 3-layer ConvNet, for 5 % additive Gaussian noise. 
 
