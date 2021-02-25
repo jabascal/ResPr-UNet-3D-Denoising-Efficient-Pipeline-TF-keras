@@ -3,7 +3,7 @@ This repository contains data, code and results for the paper **A residual U-Net
 
 We propose a modified U-Net architecture (ResPrU-Net) that exploits a prior image for 3D image denoising. The prior image is concatenated with the input and is connected to the output with a residual connection, as shown in the image below
 
-![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/ResPrUNet_sketch.jpg)
+![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/figures/ResPrUNet_sketch.jpg)
 
 The idea behind ResPrU-Net is based a previously proposed variational method SPADE (JFPJ Abascal et al, A sparse and prior based method for 3D image denoising, Proc. Eur. Signal Process. Conf. EUSIPCO, 2019, hal-02056591). In this work, we extend the idea of exploiting a prior image to learning approaches. SPADE -- a modification of TV method by including a functional that promotes sparsity wrt to the prior image -- 
 was shown to improve convergence and maintain image texture of the prior image, being less sensitive to noise and artefacts. ResPrU-Net provided better results than U-Net for high noise. 
@@ -19,7 +19,7 @@ Data provided in this repository consist of human thorax CT scans
 (kits19 dataset, https://kits19.grand-challenge.org/) 
 corrupted with additive Gaussian noise. 
 
-![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/kit19_example.jpg) 
+![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/figures/kit19_example.jpg) 
 
 A subsample of kits19 data can be directly dowloaded from https://www.dropbox.com/sh/3sozaz9m7pyxcsa/AAAx1VULqc3T4rYC55vTiuJta?dl=0 (in png format, data with loosy conversion from float64 to unit8; fetch original data from the kits19 link): 
 - **'\Data\Train\':** All slices for 6 subjects.  
@@ -29,7 +29,7 @@ A subsample of kits19 data can be directly dowloaded from https://www.dropbox.co
 
 Realistic synthetic and experimental spectral CT knee data used in the publication will be provided later on.  
 
-![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/knee_example.jpg)
+![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/figures/knee_example.jpg)
 
 ## Installation
 We provide Python code under tensorflow with keras. The python code has been tested  under Python 3.8 and tensorflow 2.4.1.  
@@ -61,9 +61,9 @@ https://towardsdatascience.com/setting-up-tensorflow-gpu-with-cuda-and-anaconda-
 The following figures show results for U-Net (with 32 and 64 filters on the first layer; 332,641 parameters) and a simple 3-layer ConvNet (37,633 parameters), for 2 % additive Gaussian noise. Unless specified, training data is comprised of 2000 slices taking randomly from all 200 subjects. Similar results were obtained by training on 10000 (10k) slices. Worse results corresponded to considering only 6 subjects (6sub, ~2k slices). U-Net 32 trained on 1h30 min and the ConvNet in 28 min. 
 Train data file: (Kits19_train_data_200subj_2kimgs_2pcnoise_crop_rnd.npz. Test data file: Kits19_test_data_2subj_2pcnoise_crop_rnd.npz.  
 
-![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/kits19_UNet_ConvNet_comp_test_ex3_sm.png) 
+![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/figures/kits19_UNet_ConvNet_comp_test_ex3_sm.png) 
 
-![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/kits19_UNet_ConvNet_comp_zoom_test_ex3_sm.png) 
+![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/figures/kits19_UNet_ConvNet_comp_zoom_test_ex3_sm.png) 
 
 The following figures show results for U-Net and a simple 3-layer ConvNet, for 5 % additive Gaussian noise. 
 
