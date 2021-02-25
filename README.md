@@ -36,14 +36,19 @@ We provide Python code under tensorflow with keras. The python code has been tes
 
 Different TF versions required specific cudatoolkit version. With anaconda one can handle several cuda versions in one machine. To install the tested version on Windows:  
    
----
+*****
 conda create -n tf2 anaconda python=3.8 
+
 conda install cudatoolkit=11.0 cudnn=8.0 -c=conda-forge
+
 pip install --upgrade tensorflow-gpu==2.4.1 
+
 python
+
 import tensorflow as tf 
+
 tf.test.is_gpu_available()
----
+*****
 
 For TF compatibilities: https://www.tensorflow.org/install/source_windows 
 For setting up Tensorflow-GPU with Cuda and Anaconda on Windows: 
