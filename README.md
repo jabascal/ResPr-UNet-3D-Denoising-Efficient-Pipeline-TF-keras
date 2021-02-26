@@ -65,9 +65,9 @@ Train data file: (Kits19_train_data_200subj_2kimgs_2pcnoise_crop_rnd.npz. Test d
 
 ![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/figures/kits19_UNet_ConvNet_comp_zoom_test_ex3_sm.png) 
 
-The following figures show results for U-Net and a simple 3-layer ConvNet, for 5 % additive Gaussian noise. 
+The following figures show results for U-Net and a simple 3-layer ConvNet, for 5 % additive Gaussian noise, trained on 2k slices. 
 
-... In progress ...
+![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/figures/kits19_5pcnoise_UNet_Convnet_2k_comp_test_ex1.png) 
 
 ##  Repository files ##
 
@@ -88,9 +88,9 @@ The repository contains the following files:
 - **Trained models and others:** Under construction 
 
 ### Trained models ###
-- **kits19_200subj_data2k_Convnet_64_noisepc2_model_best.h5:** Simple ConvNet (3 layers, 64 filters) trained on 2% additive Gaussian noise for 2,000 slices randomly selected from 200 subjects. 
+- **kits19_200subj_data2k_Convnet_64_noisepc2_model_best.h5, kits19_200subj_data2k_Convnet_64_noisepc5_model_best.h5:** Simple ConvNet (3 layers, 64 filters) trained on 2% and 5% additive Gaussian noise for 2,000 slices randomly selected from 200 subjects. 
 
-- **kits19_200subj_data2k_UNet_32_noisepc2_model_best.h5:** U-Net (32 filters on the first layer) trained on 2% additive Gaussian noise for 2,000 slices randomly selected from 200 subjects. 
+- **kits19_200subj_data2k_UNet_32_noisepc2_model_best.h5, kits19_200subj_data2k_UNet_32_noisepc5_model_best.h5:** U-Net (32 filters on the first layer) trained on 2% and 5% additive Gaussian noise for 2,000 slices randomly selected from 200 subjects. 
 
 ## Data API ##
 Tensorflow data API automatizes the data pipeline, chaining transformations (preprocessing and data augmentation), shuffling data. While the model is being trained for a given batch on the GPU, data are being prepared to be ready for next batch on the GPU.The current implementation is based on the following sources:  
