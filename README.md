@@ -36,19 +36,14 @@ We provide Python code under tensorflow with keras. The python code has been tes
 
 Different TF versions required specific cudatoolkit version. With anaconda one can handle several cuda versions in one machine. To install the tested version on Windows:  
    
-*****
+```
 conda create -n tf2 anaconda python=3.8 
-
 conda install cudatoolkit=11.0 cudnn=8.0 -c=conda-forge
-
 pip install --upgrade tensorflow-gpu==2.4.1 
-
 python
-
 import tensorflow as tf 
-
 tf.test.is_gpu_available()
-*****
+```
 
 For TF compatibilities: https://www.tensorflow.org/install/source_windows 
 For setting up Tensorflow-GPU with Cuda and Anaconda on Windows: 
@@ -75,7 +70,7 @@ The repository contains the following files:
 
 ### Python functions ###
 
-- **Train_model_denoising2D.py:** Demo to train several 2D CNN models (simple CNN, U-Net) 
+- **Train_model_denoising2D.py:** Demo to train several 2D CNN models (simple CNN, simple ResNet, U-Net) 
 
 - **Train_model_denoising3D.py:** Under construction (Demo to train 3D models (3D U-Net, ResPr-UNet)
 
@@ -93,7 +88,10 @@ The repository contains the following files:
 - **kits19_200subj_data2k_UNet_32_noisepc2_model_best.h5, kits19_200subj_data2k_UNet_32_noisepc5_model_best.h5:** U-Net (32 filters on the first layer) trained on 2% and 5% additive Gaussian noise for 2,000 slices randomly selected from 200 subjects. 
 
 ## Data API ##
-Tensorflow data API automatizes the data pipeline, chaining transformations (preprocessing and data augmentation), shuffling data. While the model is being trained for a given batch on the GPU, data are being prepared to be ready for next batch on the GPU.The current implementation is based on the following sources:  
+Tensorflow data API automatizes the data pipeline, chaining transformations (preprocessing and data augmentation), shuffling data. While the model is being trained for a given batch on the GPU, data are being prepared to be ready for next batch on the GPU.
+On the tests carried out here, using .chache (keep images in memory) and .prefetch (fetch and prepare data for next iteration), iterations were 1.6 times faster. Using tf datasets, data (image slices) are automatically fetched and pre-processed from the given directories.
+
+The current implementation is based on the following sources:  
 -Aurélien Géron, Hands-On Machine Learning with Scikit-Learn, Keras, and TensorFlow, 2nd Edition, O'Reilly Media, Inc.
 ISBN: 9781492032649
 

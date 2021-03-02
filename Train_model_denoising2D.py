@@ -1,9 +1,16 @@
 # -*- coding: utf-8 -*-
 """
 ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras
-This repository contains data, code and results for the paper, A residual U-Net network with image prior for 3D image denoising, Proc. Eur. Signal Process. Conf. EUSIPCO, pp. 1264-1268, 2020. (hal-02500664)  
+This repository contains data, code and results for the paper, 
+A residual U-Net network with image prior for 3D image denoising, 
+Proc. Eur. Signal Process. Conf. EUSIPCO, pp. 1264-1268, 2020. (hal-02500664)  
    
-Train_model_denoising2D.py: Demo to train several 2D CNN models (simple CNN, U-Net). Models are trained using data API for efficient data pipelines. 
+Train_model_denoising2D.py: Demo to train several 2D CNN models (simple CNN, U-Net, ResNet). 
+
+Learning approaches are trained using efficient tensorflow pipelines 
+for image datasets, based on keras and tf.data. Using .chache (keep images in memory) and .prefetch (fetch and prepare data for next iteration), iterations are 1.6 times faster. Data (image slices) are fetch from given directories.
+
+Tensorboard callbacks have been used to visualize losses and denoised images during training. 
     
 Data: 
 	Data provided in this repository consist of human thorax CT scans 
@@ -12,7 +19,7 @@ Data:
 
 Requirements: 
     Tested on Python 3.7 and Tensorflow 2.4.1
-
+    
 If you use this code, please cite the following publication: 
     
     JFPJ Abascal et al. A residual U-Net network with image prior for 3D 
@@ -31,6 +38,7 @@ France
 import os
 import pandas as pd
 import numpy as np
+
 import PIL
 import PIL.Image
 import pathlib
@@ -43,6 +51,9 @@ from tensorflow.keras.layers import Input
 from tensorflow.keras.layers import MaxPool2D
 from tensorflow.keras.layers import UpSampling2D
 from tensorflow.keras.layers import Concatenate
+from tensorflow.keras.layers import BatchNormalization
+from tensorflow.keras.layers import Activation
+
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
@@ -57,7 +68,7 @@ platform        = "win32" # "linux", "linux2"
 
 # Data paths for train and test
 path_main = os.getcwd()
-path_data_main   = os.path.join(path_main,'Data_few')
+path_data_main   = os.path.join(path_main,'Data')
 #subpath_data_train = "Train"
 #subpath_data_test = "Test"
 subpath_data_train = "Train"
@@ -72,45 +83,55 @@ if os.path.exists(path_results) is False:
     print('Subdirectory created for results: ' + path_results)
 
 # Name specifications
-# name_save       = 'kits19_200subj_data2k'
-name_save       = 'kits19_6subj_data2k'
+name_save       = 'kits19_200subj_data2k_256x256'
+#name_save       = 'kits19_6subj_data2k'
+
+# Callback to continue training a model from checkpoint
+mode_continue_training = False
+if mode_continue_training == True:
+    path_previous_model = os.path.join(path_results,
+                            "kits19_200subj_data2k_UNet_32_noisepc5_model_best.h5")    
+    name_save = name_save + '_cont300it'
 # -------------------------------------------------------
 # CNN
-conv_model      = "UNet" # choose model: UNet, Convnet
-conv_filt       = 32        # number of filter on first layer
+conv_model      = "UNet" # choose model: UNet, Convnet, ResNet
+#
+# Param for UNet and Convnet
+conv_filt       = 32        # filters on first layer
 kernel_size     = 3
 activation      = "relu"
 padding         = "same"
 pool_size       = (2, 2)
 
 # TRAIN
-batch_size      = 32 # 4
-epochs          = 100 # Early stopping on, check callbacks
+batch_size      = 8 # 4
+epochs          = 500       # Early stopping on, check callbacks
 optimizer       = "Adam"
-learning_rate   = 1e-4       
+learning_rate   = 1e-4      
 validation_split = 0.1
 train_eval_ratio = 0.9
 
 model_name      = conv_model + '_' + str(conv_filt )
 name_save       = name_save + '_' + model_name
 
-period_check_point = 5
+period_check_point = 1
 
 # IMAGE
-img_width, img_height, img_channels = (256,256,1)
+img_width, img_height, img_channels = (256,256,1) # (64,64,1)
 input_shape     = (img_width, img_height, img_channels)
 mode_limited_data = False
 if mode_limited_data == True:
-    ds_train_size   = 10000 # number slices in training set
+    ds_train_size   = 2000 # number slices in training set
 ds_test_size    = 100
-perc_noise      = 0.02 # Additive Gaussian noise
+# perc_noise      = 0.02 # Additive Gaussian noise
+perc_noise      = 0.05 # Additive Gaussian noise
 
 name_save = name_save + '_noisepc' + str(int(100*perc_noise))
 
 # Data augmentation
 #
 # central crop before applying random crop
-central_fraction = 0.8   
+central_fraction = 0.7   
 
 # Default display settings
 plt.rcParams['figure.figsize'] = (4.0, 4.0) # set default size of plots
@@ -257,6 +278,74 @@ def get_model_unet(input_shape = [28,28,1],
     model = keras.Model(inputs=[input_], outputs=[output])
     return model
 
+# RESNET
+#
+# Residual unit
+# Implementation based on (Aurelien Geron, Hands-on Machine Learning 
+# with Scikit-learn, Keras & Tensorflow)
+class ResidualUnit(keras.layers.Layer):
+    def __init__(self, filters, features_change=False, activation="relu", **kwargs):
+        super(ResidualUnit, self).__init__(**kwargs)
+        self.activation = keras.activations.get(activation)
+    # def build(self, filters): 
+        self.main_layers = [
+            Conv2D(filters, 3, strides=1,
+                                padding="same", use_bias=False),
+            BatchNormalization(),
+            self.activation,
+            Conv2D(filters, 3, strides=1, 
+                                padding="same", use_bias=False),
+            BatchNormalization()]
+        self.skip_layers = []
+        if features_change is True:
+            self.skip_layers = [
+                Conv2D(filters, 1, strides=1, 
+                       padding="same", use_bias=False),
+                BatchNormalization()]
+            
+    def call(self, inputs):
+        Z = inputs
+        for layer in self.main_layers:
+            Z = layer(Z)
+        skip_Z = inputs
+        for layer in self.skip_layers:
+            skip_Z = layer(skip_Z)        
+        return self.activation(Z + skip_Z)
+    
+    def get_config(self):
+        # base_config = super().get_config()
+        # direct loading model currently not working
+        base_config = super(ResidualUnit, self).get_config()
+        return {**base_config, 
+                "activation": keras.activations.serialize(self.activation)}
+#                "ResidualUnit": self.main_layers}
+    @classmethod
+    def from_config(cls, config):
+        return cls(**config)
+    
+# layer = ResidualUnit(filters=64)
+# print(layer.get_config())  
+    
+def get_model_resnet(input_shape = [28,28,1], filters = 64):
+# Implementation based on (Aurelien Geron, Hands-on Machine Learning 
+# with Scikit-learn, Keras & Tensorflow)
+    # Made strides=1 to keep same size (and nott pooling either) , 
+    # remove flattten/dense layers, and added a Conv2 at the end
+    model = keras.models.Sequential()
+    model.add(Conv2D(filters, 3, strides=1, input_shape=input_shape,
+                     padding="same", use_bias=False))
+    model.add(BatchNormalization())
+    model.add(Activation("relu"))
+    prev_filters = filters   
+    for filters in [filters]*3 + [2*filters]*4: # + [4*filters]*6 + [6*filters]*3:
+        features_change = False if filters == prev_filters else True
+        model.add(ResidualUnit(filters=filters, features_change=features_change))
+        prev_filters = filters
+    model.add(Conv2D(filters=1, kernel_size=1, padding="same",
+                     activation=None,use_bias=False))        
+    return model 
+
+
 # IMAGE VISUALIZATION
 def displaySlices(X_Tensor, titles, figsize=(12,4), nameSave = []):
     # displaySlices(X_Tensor, titles)
@@ -381,6 +470,7 @@ file_writer_cm = tf.summary.create_file_writer(log_dir + '/cm')
 image_den_cb = tf.keras.callbacks.LambdaCallback(on_epoch_end=log_denoised_image)
 
 callbacks = [tensorboard_cb, checkpoint_best_cb, image_den_cb]
+
 # -------------------------------------------------------
 # DATASETS
 
@@ -396,7 +486,7 @@ PIL.Image.open(str(filenames_train[0]))
 
 # Test set
 data_dir_test = pathlib.Path(subpath_data_test) 
-filenames_test = list(data_dir_test.glob('*/*.png'))
+#filenames_test = list(data_dir_test.glob('*/*.png'))
 fnames_test = [str(fname) for fname in filenames_test]
 
 # Datasets ds train and test
@@ -407,7 +497,7 @@ else:
 filelist_train_ds = tf.data.Dataset.from_tensor_slices(fnames_train[:ds_train_size])
 filelist_test_ds = tf.data.Dataset.from_tensor_slices(fnames_test[:ds_test_size])
 
-# Check train ds: display images
+# Check train ds: display images (can simply iterate over items in the data set)
 # filelist_ds     = tf.data.Dataset.list_files(str(data_dir/'*/*'))
 for a in filelist_train_ds.take(3):
     fname = a.numpy().decode("utf-8") # not in TF 1.4
@@ -473,14 +563,14 @@ data_test, data_test_noisy = get_imgs_from_dataset(ds_test, ds_test_size)
 """
 # Save test subset
 np.savez(os.path.join(path_data_main,
-                            'Kits19_test_data_2subj_2pcnoise_crop_rnd' + '.npz'), 
+                            name_save + '_test_crop_rnd' + '.npz'), 
                           data_test = data_test, data_test_noisy=data_test_noisy)    
 
 # Save train subset of data
 data_train, data_train_noisy = get_imgs_from_dataset(ds_train, ds_train_size)
 
 np.savez(os.path.join(path_data_main,
-                            'Kits19_train_data_200subj_2kimgs_2pcnoise_crop_rnd' + '.npz'), 
+                           name_save + '_train_crop_rnd' + '.npz'), 
                           data_train = data_train, data_train_noisy=data_train_noisy)    
 """
 
@@ -493,17 +583,18 @@ buffer_size_eval = ds_eval.cardinality().numpy()
 # a performant on-disk cache.
 # .prefetch() overlaps data preprocessing and model execution while training
 # To randomize iteration order, call shuffle after calling cache
-ds_train_batched = ds_train.batch(batch_size).cache()
-#ds_train_batched = ds_train_batched.repeat(3)
+# 
+# Without .cache it is 23 % slower, and without .cache and .prefetch 64% slower
+ds_train_batched = ds_train.batch(batch_size).cache()  # 
+##ds_train_batched = ds_train_batched.repeat(3) # repeat items of original data set
 ds_train_batched = ds_train_batched.shuffle(buffer_size=buffer_size_train, reshuffle_each_iteration=True)
 ds_train_batched = ds_train_batched.prefetch(tf.data.experimental.AUTOTUNE)  
-#
+# 
 ds_eval_batched = ds_eval.batch(batch_size).cache()
-#ds_eval_batched = ds_eval_batched.repeat(3)
+##ds_eval_batched = ds_eval_batched.repeat(3)
 ds_eval_batched = ds_eval_batched.shuffle(buffer_size=buffer_size_eval, reshuffle_each_iteration=True)
 ds_eval_batched = ds_eval_batched.prefetch(tf.data.experimental.AUTOTUNE)  
-# ds_train_batched = ds_train.batch(batch_size)
-# ds_eval_batched = ds_eval.batch(batch_size) 
+
  
 # Images eval for tensorboard summary
 images_eval = []
@@ -540,43 +631,49 @@ with file_writer_cm.as_default():
 
 # -------------------------------------------------------
 # MODEL AND TRAIN 
-if conv_model == "Convnet": # UNet, Convnet
-    model   = get_model_simple_convnet(
-        input_shape=input_shape, 
-        conv_filt=conv_filt,
-        kernel_size=kernel_size,
-        activation=activation,
-        padding=padding)
-elif conv_model == "UNet":    
-    model   = get_model_unet(
-        input_shape=input_shape, 
-        conv_filt=conv_filt,
-        kernel_size=kernel_size,
-        activation=activation,
-        padding=padding,
-        pool_size=pool_size)
+#
+if mode_continue_training == True:
+    # Continue training a model from checkpoint
+    #
+    # Load previous model
+    model = keras.models.load_model(path_previous_model) 
+    
+else:
+    # Define model
+    if conv_model == "Convnet": # UNet, Convnet
+        model   = get_model_simple_convnet(
+            input_shape=input_shape, 
+            conv_filt=conv_filt,
+            kernel_size=kernel_size,
+            activation=activation,
+            padding=padding)
+    elif conv_model == "UNet":    
+        model   = get_model_unet(
+            input_shape=input_shape, 
+            conv_filt=conv_filt,
+            kernel_size=kernel_size,
+            activation=activation,
+            padding=padding,
+            pool_size=pool_size)
+    elif conv_model == "ResNet": 
+        model =  get_model_resnet(input_shape = input_shape, filters=conv_filt)
 
-
+    loss_fn = keras.losses.MeanSquaredError()
+    optimizer = keras.optimizers.Adam(learning_rate=learning_rate)    
+    model.compile(optimizer=optimizer,
+              loss=loss_fn, 
+              metrics=["mse"])         
+         
 model.summary()
 # model.layers
 
-loss_fn = keras.losses.MeanSquaredError()
-optimizer = keras.optimizers.Adam(learning_rate=learning_rate)
-
-
 # TRAIN
-model.compile(optimizer=optimizer,
-              loss=loss_fn, 
-              metrics=["mse"])
-# model.fit(ds_train_batched, epochs=1,callbacks=[tensorboard_callback])
-start_time = time.time()
+#
+# Fit the model
 history = model.fit(ds_train_batched, 
                     epochs=epochs, 
                     validation_data=ds_eval_batched, 
                     callbacks=callbacks)
-
-timeTrain   = int(time.time()-start_time)/3600
-print('Training time (hours): {0: .2f}'.format(timeTrain))
 
 # Losses
 pd.DataFrame(history.history).plot(figsize=[8, 5], logy=True)
@@ -586,8 +683,8 @@ plt.show()
 # 
 # Load best model
 model = keras.models.load_model(os.path.join(path_results, 
-                                             name_save+'_model_best.h5'))
-    
+                                              name_save+'_model_best.h5'))
+                  
 # Test data
 data_test, data_test_noisy = get_imgs_from_dataset(ds_test, ds_test_size)
 
