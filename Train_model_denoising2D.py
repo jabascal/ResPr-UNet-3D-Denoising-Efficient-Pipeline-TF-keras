@@ -5,12 +5,17 @@ This repository contains data, code and results for the paper,
 A residual U-Net network with image prior for 3D image denoising, 
 Proc. Eur. Signal Process. Conf. EUSIPCO, pp. 1264-1268, 2020. (hal-02500664)  
    
-Train_model_denoising2D.py: Demo to train several 2D CNN models (simple CNN, U-Net, ResNet). 
+Train_model_denoising2D.py: Demo to train several 2D CNN models (simple CNN, 
+U-Net, ResNet). 
 
 Learning approaches are trained using efficient tensorflow pipelines 
-for image datasets, based on keras and tf.data. Using .chache (keep images in memory) and .prefetch (fetch and prepare data for next iteration), iterations are 1.6 times faster. Data (image slices) are fetch from given directories.
+for image datasets, based on keras and tf.data. Using .chache (keep images in 
+memory) and .prefetch (fetch and prepare data for next iteration), iterations 
+are 1.6 times faster, for training done on 40,000 images. Data (image slices) 
+are fetch from given directories.
 
-Tensorboard callbacks have been used to visualize losses and denoised images during training. 
+Tensorboard callbacks have been used to visualize losses and denoised images 
+during training. 
     
 Data: 
 	Data provided in this repository consist of human thorax CT scans 
@@ -104,8 +109,8 @@ padding         = "same"
 pool_size       = (2, 2)
 
 # TRAIN
-batch_size      = 8 # 4
-epochs          = 500       # Early stopping on, check callbacks
+batch_size      = 64 # 4
+epochs          = 20       # Early stopping on, check callbacks
 optimizer       = "Adam"
 learning_rate   = 1e-4      
 validation_split = 0.1
@@ -119,7 +124,7 @@ period_check_point = 1
 # IMAGE
 img_width, img_height, img_channels = (256,256,1) # (64,64,1)
 input_shape     = (img_width, img_height, img_channels)
-mode_limited_data = False
+mode_limited_data = True
 if mode_limited_data == True:
     ds_train_size   = 2000 # number slices in training set
 ds_test_size    = 100
@@ -170,7 +175,8 @@ def random_crop(img):
 
 # Additive noise
 def add_gaussian_noise(img):
-    img_noisy = img + perc_noise*np.random.normal(0,1,img.shape)   
+    #img_noisy = img + perc_noise*np.random.normal(0,1,img.shape)   
+    img_noisy = img + perc_noise*tf.random.normal(img.shape,mean=0,stddev=1)
     return img_noisy
     
 # Load and process image
@@ -443,14 +449,19 @@ def get_imgs_from_dataset(ds_test, ds_test_size):
 # Tensorboard
 # tensorboard --logdir=log_dir
 log_dir = get_run_logdir(path_results)    
-tensorboard_cb = keras.callbacks.TensorBoard(log_dir)
+tensorboard_cb = keras.callbacks.TensorBoard(
+    log_dir,
+    histogram_freq=10, # Histograms of weights
+    write_grads=True,  # Gradients values
+    write_images=True, # Images for weights
+    profile_batch = '5,10') # Profiling: improve performance https://www.tensorflow.org/guide/profiler
 
 # save best model every few iterations
 checkpoint_best_cb = keras.callbacks.ModelCheckpoint(
     os.path.join(path_results, name_save+'_model_best.h5'), 
     period=period_check_point, 
     save_best_only=True,
-    monitor='val_mse')
+    monitor='val_mse',)
 
 # early stopping based on a given metric
 # earlystop_cb = keras.callbacks.EarlyStopping(
@@ -484,18 +495,20 @@ fnames_train = [str(fname) for fname in filenames_train]
 print(str(filenames_train[0]))
 PIL.Image.open(str(filenames_train[0]))
 
+   
 # Test set
 data_dir_test = pathlib.Path(subpath_data_test) 
-#filenames_test = list(data_dir_test.glob('*/*.png'))
+filenames_test = list(data_dir_test.glob('*/*.png'))
 fnames_test = [str(fname) for fname in filenames_test]
 
 # Datasets ds train and test
 if mode_limited_data == False:
-    ds_train_size  = len(fnames_train)
+    ds_train_size  = len(fnames_train)    
 else:
+    # Randomly select slices from the entire training set
     random.shuffle(fnames_train)
-filelist_train_ds = tf.data.Dataset.from_tensor_slices(fnames_train[:ds_train_size])
-filelist_test_ds = tf.data.Dataset.from_tensor_slices(fnames_test[:ds_test_size])
+
+filelist_train_ds = tf.data.Dataset.from_tensor_slices(fnames_train[:ds_train_size]) 
 
 # Check train ds: display images (can simply iterate over items in the data set)
 # filelist_ds     = tf.data.Dataset.list_files(str(data_dir/'*/*'))
@@ -512,13 +525,14 @@ print("Train data num: ", ds_train.cardinality().numpy())
 print("Eval data num: ", ds_eval.cardinality().numpy())
 
 # Test set
+filelist_test_ds = tf.data.Dataset.from_tensor_slices(fnames_test[:ds_test_size])
 ds_test = filelist_test_ds.take(ds_test_size)
 print("Test data num: ", ds_test.cardinality().numpy())
 
 # Transform data
 # Load, normalize, data augmentation (random crop, horizontal flip), 
 # corrupt with additive Gaussian noise 
-map_ops     = [get_process_target, flip, random_crop] # Select data aug ops (flip, randpm_crop)
+map_ops     = [get_process_target, flip, random_crop] # Select data aug ops (flip, random_crop)
 
 # Shard operator (for several workers) used early in the dataset pipeline (when reading from a set of TFRecord files)
 # ds_train = ds_train.shard()
@@ -526,7 +540,7 @@ map_ops     = [get_process_target, flip, random_crop] # Select data aug ops (fli
 # TRAIN
 for f in map_ops:
     ds_train = ds_train.map(lambda x: f(x),
-        num_parallel_calls=tf.data.AUTOTUNE)   
+        num_parallel_calls=tf.data.AUTOTUNE) # num_parallel_calls for multithreading   
 """
 for a in ds_train.take(2):
     plt.imshow(a.numpy()[:,:,0])
@@ -587,12 +601,16 @@ buffer_size_eval = ds_eval.cardinality().numpy()
 # Without .cache it is 23 % slower, and without .cache and .prefetch 64% slower
 ds_train_batched = ds_train.batch(batch_size).cache()  # 
 ##ds_train_batched = ds_train_batched.repeat(3) # repeat items of original data set
-ds_train_batched = ds_train_batched.shuffle(buffer_size=buffer_size_train, reshuffle_each_iteration=True)
+ds_train_batched = ds_train_batched.shuffle(buffer_size=buffer_size_train, 
+                                            reshuffle_each_iteration=True,
+                                            seed = 50)
 ds_train_batched = ds_train_batched.prefetch(tf.data.experimental.AUTOTUNE)  
 # 
 ds_eval_batched = ds_eval.batch(batch_size).cache()
 ##ds_eval_batched = ds_eval_batched.repeat(3)
-ds_eval_batched = ds_eval_batched.shuffle(buffer_size=buffer_size_eval, reshuffle_each_iteration=True)
+ds_eval_batched = ds_eval_batched.shuffle(buffer_size=buffer_size_eval, 
+                                          reshuffle_each_iteration=True,
+                                            seed = 50)
 ds_eval_batched = ds_eval_batched.prefetch(tf.data.experimental.AUTOTUNE)  
 
  
@@ -662,7 +680,10 @@ else:
     optimizer = keras.optimizers.Adam(learning_rate=learning_rate)    
     model.compile(optimizer=optimizer,
               loss=loss_fn, 
-              metrics=["mse"])         
+              metrics=["mse", 
+                       "mae", # equivalent to mape for [0,1] images, mape not working properly
+                       #"mean_absolute_percentage_error" # mape = tf.keras.losses.MeanAbsolutePercentageError()
+                       ])         
          
 model.summary()
 # model.layers
