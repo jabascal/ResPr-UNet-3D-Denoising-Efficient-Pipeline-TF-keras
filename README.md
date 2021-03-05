@@ -12,7 +12,7 @@ In this repository, we provide and compare the proposed method to 2D and 3D vari
 
 Learning approaches are trained using efficient tensorflow pipelines for image datasets, based on keras and tf.data (see below for more details). 
 
-Tensorboard callbacks have been used to visualize losses and denoised images during training. 
+Tensorboard callbacks have been used to visualize losses, metrics, denoised images and histograms of the learned weights during training. TensorFlow Profiler is also used to profile the execution of the code. 
 
 ## Data 
 Data provided in this repository consist of human thorax CT scans 
