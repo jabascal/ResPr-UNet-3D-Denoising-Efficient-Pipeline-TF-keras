@@ -60,9 +60,9 @@ Train data file: (Kits19_train_data_200subj_2kimgs_2pcnoise_crop_rnd.npz. Test d
 
 ![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/figures/kits19_UNet_ConvNet_comp_zoom_test_ex3_sm.png) 
 
-The following figures show results for U-Net and a simple 3-layer ConvNet, for 5 % additive Gaussian noise, trained on 2k slices. 
+The following figures show results for U-Net and a simple 3-layer ConvNet (trained on 2k slices), split Bregman TV and BM3D, for 5 % additive Gaussian noise. 
 
-![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/figures/kits19_5pcnoise_UNet_Convnet_2k_comp_test_ex1.png) 
+![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/figures/kits19_5pcnoise_TV_BM3D_CNN_Unet.png) 
 
 ##  Repository files ##
 
