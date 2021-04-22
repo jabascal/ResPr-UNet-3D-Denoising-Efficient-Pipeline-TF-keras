@@ -66,7 +66,7 @@ The following figures show results for U-Net and a simple 3-layer ConvNet (train
 
 The following figures show results for 2D CNN and U-Net and 3D U-Net for 5 % additive Gaussian noise. 3D U-Net was trained on 200 subjects on randonmly cropped patches of 32x256x256, for 300 epochs (preliminary result; improved results should be obtained for further iterations).   
 
-![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/figures/kits19_5pcnoise3D_256x_3D_vs_2D_UNet_CNN_ex0.png.png) 
+![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/figures/kits19_5pcnoise3D_256x_3D_vs_2D_UNet_CNN_ex0.png) 
 
 ##  Repository files ##
 
