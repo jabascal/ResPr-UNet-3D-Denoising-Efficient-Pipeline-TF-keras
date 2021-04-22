@@ -56,13 +56,17 @@ https://towardsdatascience.com/setting-up-tensorflow-gpu-with-cuda-and-anaconda-
 The following figures show results for U-Net (with 32 and 64 filters on the first layer; 332,641 parameters) and a simple 3-layer ConvNet (37,633 parameters), for 2 % additive Gaussian noise. Unless specified, training data is comprised of 2000 slices taking randomly from all 200 subjects. Similar results were obtained by training on 10000 (10k) slices. Worse results corresponded to considering only 6 subjects (6sub, ~2k slices). U-Net 32 trained on 1h30 min and the ConvNet in 28 min. 
 Train data file: (Kits19_train_data_200subj_2kimgs_2pcnoise_crop_rnd.npz. Test data file: Kits19_test_data_2subj_2pcnoise_crop_rnd.npz.  
 
-![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/figures/kits19_UNet_ConvNet_comp_test_ex3_sm.png) 
-
 ![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/figures/kits19_UNet_ConvNet_comp_zoom_test_ex3_sm.png) 
 
 The following figures show results for U-Net and a simple 3-layer ConvNet (trained on 2k slices), split Bregman TV and BM3D, for 5 % additive Gaussian noise. 
 
 ![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/figures/kits19_5pcnoise_TV_BM3D_CNN_Unet.png) 
+
+### 3D learning-based approaches ###
+
+The following figures show results for 2D CNN and U-Net and 3D U-Net for 5 % additive Gaussian noise. 3D U-Net was trained on 200 subjects on randonmly cropped patches of 32x256x256, for 300 epochs (preliminary result; improved results should be obtained for further iterations).   
+
+![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/figures/kits19_5pcnoise3D_256x_3D_vs_2D_UNet_CNN_ex0.png.png) 
 
 ##  Repository files ##
 
@@ -72,11 +76,11 @@ The repository contains the following files:
 
 - **Train_model_denoising2D.py:** Demo to train several 2D CNN models (simple CNN, simple ResNet, U-Net) 
 
-- **Train_model_denoising3D.py:** Under construction (Demo to train 3D models (3D U-Net, ResPr-UNet)
+- **Train_model_denoising3D.py:** (Demo to train 3D models (3D CNN, 3D U-Net, ResPr-UNet; ResPr-UNet under construction)
 
-- **Demo_assess_2D_learning_methods.py:** Under construction 
+- **Demo_assess_2D_learning_methods.py:** Demo to compared the trained 2D models 
 
-- **Demo_assess_3D_learning_methods.py:** Under construction 
+- **Demo_assess_3D_learning_methods.py:** Demo to compared the trained 3D models 
 
 - **Demo_assess_variational_methods.py:** Under construction (Demo to assess TV, SPADE, among others)
 
@@ -86,6 +90,8 @@ The repository contains the following files:
 - **kits19_200subj_data2k_Convnet_64_noisepc2_model_best.h5, kits19_200subj_data2k_Convnet_64_noisepc5_model_best.h5:** Simple ConvNet (3 layers, 64 filters) trained on 2% and 5% additive Gaussian noise for 2,000 slices randomly selected from 200 subjects. 
 
 - **kits19_200subj_data2k_UNet_32_noisepc2_model_best.h5, kits19_200subj_data2k_UNet_32_noisepc5_model_best.h5:** U-Net (32 filters on the first layer) trained on 2% and 5% additive Gaussian noise for 2,000 slices randomly selected from 200 subjects. 
+
+- **kits19_200subj_32x256x256_3DUNet_32_noisepc5_model_best.h5:** 3D U-Net (32 filters on the first layer) trained on 5% additive Gaussian noise, 200 subjects, randonmly cropped patches of 32x256x256, for 300 epochs. 
 
 ## Data API ##
 Tensorflow data API automatizes the data pipeline, chaining transformations (preprocessing and data augmentation), shuffling data. While the model is being trained for a given batch on the GPU, data are being prepared to be ready for next batch on the GPU.
