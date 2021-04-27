@@ -1,5 +1,5 @@
 # ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras
-This repository contains data, code and results for the paper **A residual U-Net network with image prior for 3D image denoising, Proc. Eur. Signal Process. Conf. EUSIPCO, pp. 1264-1268, 2020. (hal-02500664)** 
+This repository contains data, code and results for the paper **A residual U-Net network with image prior for 3D image denoising, Proc. Eur. Signal Process. Conf. EUSIPCO, pp. 1264-1268, 2020. ** hal-02500664: https://hal.archives-ouvertes.fr/hal-02500664/document
 
 We propose a modified U-Net architecture (ResPrU-Net) that exploits a prior image for 3D image denoising. The prior image is concatenated with the input and is connected to the output with a residual connection, as shown in the image below
 
