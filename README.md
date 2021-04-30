@@ -32,6 +32,8 @@ Realistic synthetic and experimental spectral CT knee data used in the publicati
 ![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/figures/knee_example.jpg)
 
 ## Installation
+Try simply the code on google colab notebook. Just open on your google drive and it is ready to use the free google cloud service with free GPU! 
+
 We provide Python code under tensorflow with keras. The python code has been tested  under Python 3.8 and tensorflow 2.4.1.  
 
 Different TF versions required specific cudatoolkit version. With anaconda one can handle several cuda versions in one machine. To install the tested version on Windows:  
@@ -76,7 +78,7 @@ The repository contains the following files:
 
 - **Train_model_denoising2D.py:** Demo to train several 2D CNN models (simple CNN, simple ResNet, U-Net) 
 
-- **Train_model_denoising2D.ipynb:** Google colab notebook to train UNet model: Fetch data, build pipeline and train the network using google colab free cloud service with GPU!!! (Under construction)
+- **Train_model_denoising2D.ipynb:** Google colab notebook to train UNet model: Fetch data, build pipeline and train the network using google colab free cloud service with GPU
 
 - **Train_model_denoising3D.py:** (Demo to train 3D models (3D CNN and 3D U-Net)
 
