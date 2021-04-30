@@ -76,7 +76,11 @@ The repository contains the following files:
 
 - **Train_model_denoising2D.py:** Demo to train several 2D CNN models (simple CNN, simple ResNet, U-Net) 
 
-- **Train_model_denoising3D.py:** (Demo to train 3D models (3D CNN, 3D U-Net, ResPr-UNet; ResPr-UNet under construction)
+- **Train_model_denoising2D.ipynb:** Google colab notebook to train UNet model: Fetch data, build pipeline and train the network using google colab free cloud service with GPU!!! (Under construction)
+
+- **Train_model_denoising3D.py:** (Demo to train 3D models (3D CNN and 3D U-Net)
+
+- **Train_model_denoising_ResPrUNet.py:** (Demo to train a 3D model for ResPr-UNet (under construction)
 
 - **Demo_assess_2D_learning_methods.py:** Demo to compared the trained 2D models 
 
