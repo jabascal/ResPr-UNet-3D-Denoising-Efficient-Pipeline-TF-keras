@@ -32,9 +32,11 @@ Realistic synthetic and experimental spectral CT knee data used in the publicati
 ![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/figures/knee_example.jpg)
 
 ## Installation
-Try simply the code on google colab notebook. Just open on your google drive and it is ready to use the free google cloud service with free GPU! 
+There are tow options to try the code: 
 
-We provide Python code under tensorflow with keras. The python code has been tested  under Python 3.8 and tensorflow 2.4.1.  
+- Try simply the code on google colab notebook. Just open on your google drive and it is ready to use the free google cloud service with free GPU! 
+
+- Use provided Python code under tensorflow with keras. The python code has been tested under Python 3.8 and tensorflow 2.4.1. Installation guidelines below.  
 
 Different TF versions required specific cudatoolkit version. With anaconda one can handle several cuda versions in one machine. To install the tested version on Windows:  
    
