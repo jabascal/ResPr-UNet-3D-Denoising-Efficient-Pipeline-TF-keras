@@ -69,6 +69,7 @@ The following figures show results for U-Net and a simple 3-layer ConvNet (train
 ### 3D learning-based approaches ###
 
 The following figures show results for 2D CNN and U-Net and 3D U-Net for 10 % additive Gaussian noise. Figure from Demo_assess_compare_models.ipynb. 
+
 ![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/figures/kits19_2D_3D_models_comparison.png) 
 
 ##  Repository files ##
