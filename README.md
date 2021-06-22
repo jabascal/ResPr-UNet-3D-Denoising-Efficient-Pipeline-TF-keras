@@ -32,13 +32,13 @@ Realistic synthetic and experimental spectral CT knee data used in the publicati
 ![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/figures/knee_example.jpg)
 
 ## Installation
-There are tow options to try the code: 
+There are two options to try out the code: 
 
-- Try simply the code on google colab notebook. Just open on your google drive and it is ready to use the free google cloud service with free GPU! 
+- Use the google colab notebook for training or assessing results. Just open on your google drive and it is ready to use the free google cloud service with free GPU! 
 
 - Use provided Python code under tensorflow with keras. The python code has been tested under Python 3.8 and tensorflow 2.4.1. Installation guidelines below.  
 
-Different TF versions required specific cudatoolkit version. With anaconda one can handle several cuda versions in one machine. To install the tested version on Windows:  
+Different TF versions required specific cudatoolkit version. With anaconda one can handle several cuda versions in one machine. To install the tested version on Windows (should work also in linux):  
    
 ```
 conda create -n tf2 anaconda python=3.8 
@@ -70,7 +70,7 @@ The following figures show results for U-Net and a simple 3-layer ConvNet (train
 
 The following figures show results for 2D CNN and U-Net and 3D U-Net for 5 % additive Gaussian noise. 3D U-Net was trained on 200 subjects on randonmly cropped patches of 32x256x256, for 300 epochs (preliminary result; improved results should be obtained for further iterations).   
 
-![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/figures/kits19_5pcnoise3D_256x_3D_vs_2D_UNet_CNN_ex0.png) 
+![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/figures/kits19_2D_3D_models_comparison.png) 
 
 ##  Repository files ##
 
@@ -78,9 +78,11 @@ The repository contains the following files:
 
 ### Python functions ###
 
-- **Train_model_denoising2D.py:** Demo to train several 2D CNN models (simple CNN, simple ResNet, U-Net) 
-
 - **Train_model_denoising2D.ipynb:** Google colab notebook to train UNet model: Fetch data, build pipeline and train the network using google colab free cloud service with GPU
+
+- **Demo_assess_compare_models.ipynb:** Google colab notebook to assess and compare 2D and 3D models
+
+- **Train_model_denoising2D.py:** Demo to train several 2D CNN models (simple CNN, simple ResNet, U-Net) 
 
 - **Train_model_denoising3D.py:** (Demo to train 3D models (3D CNN and 3D U-Net)
 
@@ -90,11 +92,11 @@ The repository contains the following files:
 
 - **Demo_assess_3D_learning_methods.py:** Demo to compared the trained 3D models 
 
-- **Demo_assess_variational_methods.py:** Under construction (Demo to assess TV, SPADE, among others)
-
-- **Trained models and others:** Under construction 
+- **Train and assess ResPrUNet:** Under construction 
 
 ### Trained models ###
+- **Data and models for notebook comparison:** Models trained on 10 % noise. Can be fetched from the notebook. Link: https://www.dropbox.com/s/occmmmvpsttby26/data_models_denoising_comparison.zip?dl=0
+
 - **kits19_200subj_data2k_Convnet_64_noisepc2_model_best.h5, kits19_200subj_data2k_Convnet_64_noisepc5_model_best.h5:** Simple ConvNet (3 layers, 64 filters) trained on 2% and 5% additive Gaussian noise for 2,000 slices randomly selected from 200 subjects. 
 
 - **kits19_200subj_data2k_UNet_32_noisepc2_model_best.h5, kits19_200subj_data2k_UNet_32_noisepc5_model_best.h5:** U-Net (32 filters on the first layer) trained on 2% and 5% additive Gaussian noise for 2,000 slices randomly selected from 200 subjects. 
