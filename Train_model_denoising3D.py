@@ -6,19 +6,10 @@ A residual U-Net network with image prior for 3D image denoising,
 Proc. Eur. Signal Process. Conf. EUSIPCO, pp. 1264-1268, 2020. (hal-02500664)  
    
 Train_model_denoising3D.py: Demo to train several 3D CNN models (simple CNN, 
-U-Net, and PrResUNet (PrResUNet in progress) ). 
+U-Net, ResNet). 
 
-Pipeline:
-    Model is trained on 3D stacks (patches of 256x256x32). High resolution on x 
-    and y provides good results for U-Net given its multilevel processing. 
-    Data are the loaded and process in the first epoch and kept in memory
-    (using cache). Can reduce the number of subjects with mode_limited_data and
-    ds_train_size. 
-    
-    We use patches 2x256x256x32 for 11GB GPU memory
-
-    Learning approaches are trained using efficient tensorflow pipelines 
-    for image datasets, based on keras and tf.data. 
+Learning approaches are trained using efficient tensorflow pipelines 
+for image datasets, based on keras and tf.data. 
     3D loading takes 92% time: 18s per epoch for 15 subjects (1.2 min per subject)
     Using chache (keep images in memory) before cropping images 
     reduces epoch to 6s, 20s for 75 subjects, 238s (230s with prefetch) for 200 subjects. 
@@ -32,15 +23,9 @@ Data:
 	Data provided in this repository consist of human thorax CT scans 
 	(kits19 dataset, https://kits19.grand-challenge.org/) 
 	corrupted with additive Gaussian noise. 
-    
-    We used the interpolated datasets (same dimensions).
-    Datasets can be unzipped into directory \kits19-interpolated 
-    Subjects are divided in folders case_00000, case_00001, ..., case_00299
-    Each folder constains a file imaging.nii.gz (~250MB)
 
 Requirements: 
     Tested on Python 3.7 and Tensorflow 2.4.1
-    Data (3D scans) are loaded using NiBabel
     
 If you use this code, please cite the following publication: 
     
@@ -62,6 +47,8 @@ import os
 import pandas as pd
 import numpy as np
 
+import PIL
+import PIL.Image
 import pathlib
 import time
 import tensorflow as tf
@@ -92,18 +79,19 @@ if os.path.exists(path_results) is False:
     os.mkdir(path_results)
     print('Subdirectory created for results: ' + path_results)
 
+    
 # Name specifications
-name_save       = 'kits19_200subj_256x256'
+name_save       = 'kits19_50subj_256x256'
 
 # Callback to continue training a model from checkpoint
 mode_continue_training = False
 if mode_continue_training == True:
     path_previous_model = os.path.join(path_results,
                             "kits19_200subj_256x256_3DUNet_32_noisepc5_model_best.h5")    
-    name_save = name_save + '_cont500it'
+    name_save = name_save + '_cont320it'
 # -------------------------------------------------------
 # CNN
-conv_model      = "3DUNet" # choose model: 3DUNet, 3DCNN
+conv_model      = "3DUNet" # choose model: 3DUNet, 3DCNN, 3DPrResUNet
 #
 # Param for UNet and Convnet
 conv_filt       = 32        # filters on first layer
@@ -114,7 +102,7 @@ pool_size       = (2, 2, 2)
 
 # TRAIN
 batch_size      = 2 # 4
-epochs          = 200       # Early stopping on, check callbacks
+epochs          = 5000       # Early stopping on, check callbacks
 optimizer       = "Adam"
 learning_rate   = 1e-4      
 
@@ -134,16 +122,15 @@ img_shape_load = (100, 600, 600, 1)
 # Split data
 # validation_split = 0.1
 # train_eval_ratio = 0.9
-ds_test_size    = 10
-ds_eval_size    = 10
-ds_train_size   = 280
+ds_test_size    = 1
+ds_eval_size    = 4
+ds_train_size   = 45
 
-mode_limited_data = True
+mode_limited_data = False
 if mode_limited_data == True:
     ds_train_size   = 200 # number slices in training set
 
-# perc_noise      = 0.02 # Additive Gaussian noise
-perc_noise      = 0.05 # Additive Gaussian noise
+perc_noise      = 0.1 # Additive Gaussian noise
 
 name_save = name_save + '_noisepc' + str(int(100*perc_noise))
 
@@ -172,7 +159,7 @@ def normalize(volume):
     volume[volume > max] = max
     volume = (volume - min) / (max - min)
     volume = volume.astype("float32")
-    return volume 
+    return volume   
 
 def read_nifti_file(filepath):
     """Read and load volume:"""
@@ -180,7 +167,6 @@ def read_nifti_file(filepath):
     scan = np.asarray(nib.load(filepath).get_fdata())
     scan = normalize(scan) # do later af filter!
     scan = tf.convert_to_tensor(scan, tf.float32)        
-
     return scan
 
 def resize_scan(scan):
@@ -340,7 +326,8 @@ def displaySlices(X_Tensor, titles, figsize=(12,4), nameSave = []):
 
 def image_grid(images_eval_rnp, images_eval_rnp_labels):
   """Return a grid image as a matplotlib figure."""
-  # Create a figure to contain the plot
+  # Create a figure to contain the plot.
+
   figure = plt.figure(figsize=(12,4))
   for i in range(3):
     # Start next subplot.
@@ -434,11 +421,8 @@ callbacks = [tensorboard_cb, checkpoint_best_cb, image_den_cb]
 data_dir_train = pathlib.Path(path_data_main) 
 filenames_train = list(data_dir_train.glob('*/imaging.nii.gz'))
 fnames_train = [str(fname) for fname in filenames_train]
-# img = nib.load(str(filenames_train[0]))
-# data = img.get_fdata()
 img = read_nifti_file(filenames_train[0])
 plt.imshow(img[10,:,:]); plt.colorbar(); plt.show();
-# hdr = img.header
 
 # Datasets ds train and test
 if mode_limited_data == False:
@@ -462,12 +446,17 @@ fnames_train = fnames_train[:ds_train_size]
 # output_signature=(
 #         tf.TensorSpec(shape=(), dtype=tf.int32),
 #         tf.RaggedTensorSpec(shape=(2, None), dtype=tf.int32)))
-ds_train = tf.data.Dataset.from_generator(lambda : gen(fnames=fnames_train),
-    output_signature=(tf.TensorSpec(shape=img_shape_load, dtype=tf.float32)))
-ds_eval = tf.data.Dataset.from_generator(lambda : gen(fnames=fnames_eval), 
-    (tf.float32), output_shapes=(tf.TensorShape(img_shape_load)))
-ds_test = tf.data.Dataset.from_generator(lambda : gen(fnames=fnames_test), 
-    (tf.float32), output_shapes=(tf.TensorShape(img_shape_load)))                                      
+# ds_train = tf.data.Dataset.from_generator(lambda : gen(fnames=fnames_train),
+#     output_signature=(tf.TensorSpec(shape=img_shape_load, dtype=tf.float32)))
+# ds_eval = tf.data.Dataset.from_generator(lambda : gen(fnames=fnames_eval), 
+#     (tf.float32), output_shapes=(tf.TensorShape(img_shape_load)))
+# ds_test = tf.data.Dataset.from_generator(lambda : gen(fnames=fnames_test), 
+#     (tf.float32), output_shapes=(tf.TensorShape(img_shape_load)))                                      
+ds_train = tf.data.Dataset.from_generator(lambda : gen(fnames=fnames_train), (tf.float32), output_shapes=(tf.TensorShape(img_shape_load)))
+ds_eval = tf.data.Dataset.from_generator(lambda : gen(fnames=fnames_eval), (tf.float32), output_shapes=(tf.TensorShape(img_shape_load)))
+ds_test = tf.data.Dataset.from_generator(lambda : gen(fnames=fnames_test), (tf.float32), output_shapes=(tf.TensorShape(img_shape_load)))
+
+# ds_train = ds_train.apply()
 
 """ 
 for a in ds_train.take(3):
@@ -486,13 +475,13 @@ list(dataset.as_numpy_iterator())
 # Add noise
 ds_train = ds_train.map(  # return tuple (noisy, target) for training
         lambda x: (add_gaussian_noise(x), x),
-        num_parallel_calls = tf.data.AUTOTUNE)
+        num_parallel_calls = tf.data.experimental.AUTOTUNE)
 ds_eval = ds_eval.map(  # return tuple (noisy, target) for training
         lambda x: (add_gaussian_noise(x), x),
-        num_parallel_calls = tf.data.AUTOTUNE)
+        num_parallel_calls = tf.data.experimental.AUTOTUNE)
 ds_test = ds_test.map(  # return tuple (noisy, target) for training
         lambda x: (add_gaussian_noise(x), x),
-        num_parallel_calls = tf.data.AUTOTUNE)
+        num_parallel_calls = tf.data.experimental.AUTOTUNE)
 
 print('Examples of training data random crops')
 for a,b in ds_train.take(2):
@@ -511,20 +500,16 @@ for a,b in ds_train.take(2):
 # 
 # Apply time consuming operations before cache
 ds_train = ds_train.cache()   
-ds_train = ds_train.map(random_crop_two_imgs, num_parallel_calls=tf.data.AUTOTUNE)
-# ds_train_batched = ds_train_batched.repeat(3) # repeat items of original data set
-# ds_train = ds_train.shuffle(buffer_size=ds_train_size, 
-#                                              reshuffle_each_iteration=True,
-#                                              seed = 50)
+ds_train = ds_train.map(random_crop_two_imgs, num_parallel_calls=tf.data.experimental.AUTOTUNE)
 ds_train_batched = ds_train.batch(batch_size)
 ds_train_batched = ds_train_batched.prefetch(tf.data.experimental.AUTOTUNE)  
 # 
 ds_eval = ds_eval.cache()   
-ds_eval = ds_eval.map(random_crop_two_imgs, num_parallel_calls=tf.data.AUTOTUNE)
+ds_eval = ds_eval.map(random_crop_two_imgs, num_parallel_calls=tf.data.experimental.AUTOTUNE)
 ds_eval_batched = ds_eval.batch(batch_size)
 ds_eval_batched = ds_eval_batched.prefetch(tf.data.experimental.AUTOTUNE)  
 
-ds_test = ds_test.map(random_crop_two_imgs, num_parallel_calls=tf.data.AUTOTUNE)
+ds_test = ds_test.map(random_crop_two_imgs, num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
 # Images eval for tensorboard summary
 images_eval = []
@@ -533,6 +518,7 @@ count = 0
 for a_n, a in ds_eval_batched.take(1):
     images_eval = a.numpy()
     images_eval_noisy = a_n.numpy()
+
 
 """
 # Write images to tensorboard
@@ -558,7 +544,6 @@ with file_writer_cm.as_default():
     tf.summary.image("Denoised image", plot_to_image(figure), step=0)
     
 """
-
 
 """
 # Test data
@@ -613,10 +598,6 @@ else:
                        #"mean_absolute_percentage_error" # mape = tf.keras.losses.MeanAbsolutePercentageError()
                        ])         
          
-# model.layers
-
-#cnn_output = model(data_test_noisy)
-
 # TRAIN
 #
 # Fit the model
@@ -654,10 +635,6 @@ data_test_norm = np.sqrt(np.sum(np.square(data_test)))
 data_pred_err = np.sqrt(np.sum(np.square(data_test-data_pred)))/data_test_norm
 
 print('Error %.2f' % (100.0*data_pred_err))
-
-# Evaluation
-#with tf.name_scope("eval"):    
-#    mse_rel    = tf.norm(X - X_)/tf.norm(X)
 
 # Display result
 print('Example of restored images')
