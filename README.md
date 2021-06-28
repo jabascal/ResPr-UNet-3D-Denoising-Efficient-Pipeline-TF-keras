@@ -94,6 +94,8 @@ The repository contains the following files:
 
 - **Train and assess ResPrUNet:** Under construction 
 
+- **Demo_assess_sparsity_models.ipynb:** Demo to assess sparsity models: TV and BM3D. 
+
 ### Trained models ###
 - **Data and models for notebook comparison:** Models trained on 10 % noise. Can be fetched from the notebook. Link: https://www.dropbox.com/s/occmmmvpsttby26/data_models_denoising_comparison.zip?dl=0
 
