@@ -21,6 +21,7 @@ corrupted with additive Gaussian noise.
 
 ![](https://github.com/jabascal/ResPr-UNet-3D-Denoising-Efficient-Pipeline-TF-keras/blob/main/figures/kit19_example.jpg) 
 
+
 A subsample of kits19 data can be directly dowloaded from https://www.dropbox.com/sh/3sozaz9m7pyxcsa/AAAx1VULqc3T4rYC55vTiuJta?dl=0 (in png format, data with loosy conversion from float64 to unit8; fetch original data from the kits19 link): 
 - **'\Data\Train\':** All slices for 6 subjects.  
 - **'\Data\Test':** All slices for 2 subjects. 
